@@ -62,6 +62,9 @@ BluetoothTransportAdapter::BluetoothTransportAdapter()
                          new BluetoothConnectionFactory(this), 0) {
 }
 
+BluetoothTransportAdapter::~BluetoothTransportAdapter() {
+}
+
 DeviceType BluetoothTransportAdapter::GetDeviceType() const {
   return BLUETOOTH;
 }

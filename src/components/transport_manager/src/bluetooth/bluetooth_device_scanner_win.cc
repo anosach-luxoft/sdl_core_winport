@@ -263,7 +263,7 @@ void BluetoothDeviceScanner::DoInquiry() {
                            &paired_devices_with_sdl_);
   UpdateTotalDeviceList();
 
-  LOG4CXX_INFO(logger_, "Starting hci_inquiry on device " << device_id);
+  LOG4CXX_INFO(logger_, "Starting hci_inquiry on device " << (int)device_handle);
   std::vector < BTH_ADDR *> found_devices;
   int number_of_devices = -1;
   while (WSALookupServiceNext(device_handle, LUP_RETURN_NAME | LUP_RETURN_ADDR, &dwSize, pwsaResults) == 0){

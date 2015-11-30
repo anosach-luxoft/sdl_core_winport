@@ -124,7 +124,7 @@ bool BluetoothSocketConnection::Establish(ConnectError** error) {
   if (0 != connect_status) {
     LOG4CXX_DEBUG(logger_,
                   "Failed to Connect to remote device " << BluetoothDevice::GetUniqueDeviceId(
-                    remoteSocketAddress.rc_bdaddr) << " for session " << this);
+                    remoteSocketAddress.btAddr) << " for session " << this);
     *error = new ConnectError();
     LOG4CXX_TRACE(logger_, "exit with FALSE");
     return false;
