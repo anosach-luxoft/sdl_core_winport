@@ -32,40 +32,39 @@
 #ifndef SRC_COMPONENTS_UTILS_INCLUDE_UTILS_PIPE_H_
 #define SRC_COMPONENTS_UTILS_INCLUDE_UTILS_PIPE_H_
 
-#include <cstdint>
 #include <string>
-#include "utils/macro.h"
+#include <vector>
+#include <cstdint>
+#include <cstddef>
 
-#if defined(_MSC_VER)
-typedef SSIZE_T ssize_t;
-#endif
+#include "utils/macro.h"
+#include "utils/pimpl.h"
 
 namespace utils {
 
-class Pipe {
+class Pipe : public Pimpl<Pipe> {
  public:
-  Pipe();
+  class Impl;
+
+  Pipe(const std::string& name);
   ~Pipe();
 
-  Pipe(Pipe& rh);
-  Pipe& operator=(Pipe& rh);
-
-  bool Valid() const;
-
-  bool Create(const std::string& name);
+  bool Create();
+  void Delete();
+  bool IsCreated() const;
 
   bool Open();
-  bool Close();
+  void Close();
+  bool IsOpened() const;
 
-  ssize_t Write(const char* buf, size_t length);
-
-  void Swap(Pipe& rh);
-
- private:
-  class Impl;
-  explicit Pipe(Impl* impl);
-
-  Impl* impl_;
+  bool Read(
+      std::vector<uint8_t>& buffer,
+      size_t bytes_to_read,
+      size_t& bytes_read);
+  bool Write(
+      const std::vector<uint8_t>& buffer,
+      size_t bytes_to_write,
+      size_t& bytes_written);
 };
 
 }  // namespace utils
