@@ -1057,8 +1057,12 @@ void Profile::UpdateValues() {
                   kMediaManagerSection,
                   kNamedVideoPipePathKey);
 
+#if defined(WIN_NATIVE)
+  named_video_pipe_path_ = "\\\\.\\pipe\\" + named_video_pipe_path_;
+#else
   named_video_pipe_path_ =
       file_system::ConcatPath(app_storage_folder_, named_video_pipe_path_);
+#endif
 
   LOG_UPDATED_VALUE(
       named_video_pipe_path_, kNamedVideoPipePathKey, kMediaManagerSection);
@@ -1069,8 +1073,12 @@ void Profile::UpdateValues() {
                   kMediaManagerSection,
                   kNamedAudioPipePathKey);
 
+#if defined(WIN_NATIVE)
+  named_audio_pipe_path_ = "\\\\.\\pipe\\" + named_audio_pipe_path_;
+#else
   named_audio_pipe_path_ =
       file_system::ConcatPath(app_storage_folder_, named_audio_pipe_path_);
+#endif
 
   LOG_UPDATED_VALUE(
       named_audio_pipe_path_, kNamedAudioPipePathKey, kMediaManagerSection);
