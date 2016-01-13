@@ -33,9 +33,9 @@
 #define SRC_COMPONENTS_UTILS_INCLUDE_UTILS_PIPE_H_
 
 #include <string>
+#include <cstdint>
 #include <cstddef>
 
-#include "utils/macro.h"
 #include "utils/pimpl.h"
 
 namespace utils {

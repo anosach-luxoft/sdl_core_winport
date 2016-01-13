@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Ford Motor Company
+ * Copyright (c) 2016, Ford Motor Company
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,61 +32,47 @@
 #ifndef SRC_COMPONENTS_UTILS_INCLUDE_UTILS_SOCKET_H_
 #define SRC_COMPONENTS_UTILS_INCLUDE_UTILS_SOCKET_H_
 
+#include <string>
 #include <cstdint>
-#include <algorithm>
-#include "utils/macro.h"
+#include <cstddef>
 
-#if defined(_MSC_VER)
-#include "utils/winhdr.h"
-typedef SSIZE_T ssize_t;
-#endif
+#include "utils/pimpl.h"
 
 namespace utils {
 
 class TcpSocketConnection {
  public:
-  class Impl;
-
   TcpSocketConnection();
-
-  TcpSocketConnection(TcpSocketConnection& rhs);
-
-  TcpSocketConnection& operator=(TcpSocketConnection& rhs);
-
-  explicit TcpSocketConnection(Impl* impl);
-
+  TcpSocketConnection(int tcp_socket);
   ~TcpSocketConnection();
 
-  ssize_t Send(const char* buffer, std::size_t size);
+  bool Send(const uint8_t* buffer,
+            size_t bytes_to_sent,
+            size_t& bytes_sent);
 
-  bool Close();
-
+  void Close();
   bool IsValid() const;
 
  private:
-  void Swap(TcpSocketConnection& rhs);
-
-  Impl* impl_;
+  class Impl;
+  Pimpl<Impl> impl_;
 };
 
 class TcpServerSocket {
  public:
   TcpServerSocket();
-
   ~TcpServerSocket();
 
+  bool Listen(const std::string& address, uint16_t port, uint16_t backlog);
   bool IsListening() const;
-
-  bool Close();
-
-  bool Listen(const std::string& address, int port, int backlog);
 
   TcpSocketConnection Accept();
 
+  void Close();
+
  private:
   class Impl;
-
-  Impl* impl_;
+  Pimpl<Impl> impl_;
 };
 
 }  // namespace utils

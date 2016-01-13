@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <string>
+#include <cstdint>
 #include <cstddef>
 #include <unistd.h>
 #include <sys/types.h>

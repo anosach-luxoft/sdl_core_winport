@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, Ford Motor Company
+ * Copyright (c) 2016, Ford Motor Company
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,30 +29,33 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <algorithm>
+#include <string>
+#include <cstdint>
+#include <cstddef>
 
 #include "utils/winhdr.h"
 #include "utils/socket.h"
+#include "utils/pimpl_impl.h"
+#include "utils/logger.h"
 
 CREATE_LOGGERPTR_GLOBAL(logger_ptr, "Utils.TcpSocket")
 
 namespace {
 
-bool CloseSocket(SOCKET& socket) {
+void CloseSocket(SOCKET& socket) {
   LOG4CXX_AUTO_TRACE(logger_ptr);
   if (NULL == socket) {
     LOG4CXX_DEBUG(logger_ptr,
                   "Socket " << socket << " is not valid. Skip closing.");
-    return true;
+    return;
   }
   if (SOCKET_ERROR != closesocket(socket)) {
     LOG4CXX_WARN(logger_ptr,
                  "Failed to close socket " << socket << ": "
                                            << WSAGetLastError());
-    return false;
+    return;
   }
   socket = NULL;
-  return true;
 }
 
 }  // namespace
@@ -63,16 +66,16 @@ bool CloseSocket(SOCKET& socket) {
 
 class utils::TcpSocketConnection::Impl {
  public:
+  friend utils::TcpSocketConnection;
+
   Impl();
-
-  explicit Impl(SOCKET tcp_socket);
-
   ~Impl();
 
-  ssize_t Send(const char* buffer, std::size_t size);
+  bool Send(const uint8_t* buffer,
+            size_t bytes_to_send,
+            size_t& bytes_sent);
 
-  bool Close();
-
+  void Close();
   bool IsValid() const;
 
  private:
@@ -81,30 +84,35 @@ class utils::TcpSocketConnection::Impl {
 
 utils::TcpSocketConnection::Impl::Impl() : tcp_socket_(NULL) {}
 
-utils::TcpSocketConnection::Impl::Impl(SOCKET tcp_socket)
-    : tcp_socket_(tcp_socket) {}
-
 utils::TcpSocketConnection::Impl::~Impl() {
   Close();
 }
 
-ssize_t utils::TcpSocketConnection::Impl::Send(const char* buffer,
-                                               std::size_t size) {
+bool utils::TcpSocketConnection::Impl::Send(const uint8_t* buffer,
+                                            size_t bytes_to_send,
+                                            size_t& bytes_sent) {
   LOG4CXX_AUTO_TRACE(logger_ptr);
+  bytes_sent = 0;
+
   if (!IsValid()) {
     LOG4CXX_ERROR(logger_ptr, "Failed to send data socket is not valid");
-    return -1;
+    return false;
   }
   const int flags = 0;
-  int result = send(tcp_socket_, buffer, size, flags);
+  int result = send(tcp_socket_,
+                    reinterpret_cast<const char*>(buffer),
+                    static_cast<int>(bytes_to_send),
+                    flags);
   if (SOCKET_ERROR == result) {
     LOG4CXX_ERROR(logger_ptr, "Failed to send data: " << WSAGetLastError());
+    return false;
   }
-  return result;
+  bytes_sent = static_cast<size_t>(result);
+  return true;
 }
 
-bool utils::TcpSocketConnection::Impl::Close() {
-  return CloseSocket(tcp_socket_);
+void utils::TcpSocketConnection::Impl::Close() {
+  CloseSocket(tcp_socket_);
 }
 
 bool utils::TcpSocketConnection::Impl::IsValid() const {
@@ -115,39 +123,24 @@ bool utils::TcpSocketConnection::Impl::IsValid() const {
 /// utils::TcpSocketConnection
 ////////////////////////////////////////////////////////////////////////////////
 
-utils::TcpSocketConnection::TcpSocketConnection() : impl_(new Impl()) {}
+utils::TcpSocketConnection::TcpSocketConnection() {
+}
 
-utils::TcpSocketConnection::TcpSocketConnection(Impl* impl) : impl_(impl) {
-  DCHECK(impl_);
+utils::TcpSocketConnection::TcpSocketConnection(int tcp_socket) {
+  impl_->tcp_socket_ = static_cast<SOCKET>(tcp_socket);
 }
 
 utils::TcpSocketConnection::~TcpSocketConnection() {
-  delete impl_;
 }
 
-utils::TcpSocketConnection::TcpSocketConnection(TcpSocketConnection& rhs) {
-  Swap(rhs);
+bool utils::TcpSocketConnection::Send(const uint8_t* buffer,
+                                      size_t bytes_to_send,
+                                      size_t& bytes_sent) {
+  return impl_->Send(buffer, bytes_to_send, bytes_sent);
 }
 
-utils::TcpSocketConnection& utils::TcpSocketConnection::operator=(
-    TcpSocketConnection& rhs) {
-  if (this != &rhs) {
-    Swap(rhs);
-  }
-  return *this;
-}
-
-void utils::TcpSocketConnection::Swap(TcpSocketConnection& rhs) {
-  using std::swap;
-  swap(impl_, rhs.impl_);
-}
-
-ssize_t utils::TcpSocketConnection::Send(const char* buffer, std::size_t size) {
-  return impl_->Send(buffer, size);
-}
-
-bool utils::TcpSocketConnection::Close() {
-  return impl_->Close();
+void utils::TcpSocketConnection::Close() {
+  impl_->Close();
 }
 
 bool utils::TcpSocketConnection::IsValid() const {
@@ -160,24 +153,19 @@ bool utils::TcpSocketConnection::IsValid() const {
 
 class utils::TcpServerSocket::Impl {
  public:
-  explicit Impl();
-
+  Impl();
   ~Impl();
 
+  bool Listen(const std::string& address, uint16_t port, uint16_t backlog);
   bool IsListening() const;
-
-  bool Close();
-
-  bool Listen(const std::string& address, int port, int backlog);
 
   TcpSocketConnection Accept();
 
-  ssize_t Send(const char* buf, size_t length);
+  void Close();
 
  private:
   SOCKET server_socket_;
-
-  bool is_listening_;
+  bool   is_listening_;
 };
 
 utils::TcpServerSocket::Impl::Impl()
@@ -191,13 +179,13 @@ bool utils::TcpServerSocket::Impl::IsListening() const {
   return server_socket_ && is_listening_;
 }
 
-bool utils::TcpServerSocket::Impl::Close() {
-  return CloseSocket(server_socket_);
+void utils::TcpServerSocket::Impl::Close() {
+  CloseSocket(server_socket_);
 }
 
 bool utils::TcpServerSocket::Impl::Listen(const std::string& address,
-                                          int port,
-                                          int backlog) {
+                                          uint16_t port,
+                                          uint16_t backlog) {
   LOG4CXX_AUTO_TRACE(logger_ptr);
   if (IsListening()) {
     LOG4CXX_ERROR(logger_ptr, "Cannot listen. Already listeneing.");
@@ -234,7 +222,7 @@ bool utils::TcpServerSocket::Impl::Listen(const std::string& address,
     return false;
   }
 
-  if (SOCKET_ERROR == listen(server_socket_, backlog)) {
+  if (SOCKET_ERROR == listen(server_socket_, static_cast<int>(backlog))) {
     LOG4CXX_ERROR(logger_ptr, "Unable to listen: " << WSAGetLastError());
     server_socket_ = NULL;
     return false;
@@ -256,31 +244,30 @@ utils::TcpSocketConnection utils::TcpServerSocket::Impl::Accept() {
                   "Failed to accept client socket: " << WSAGetLastError());
     return utils::TcpSocketConnection();
   }
-  return TcpSocketConnection(new TcpSocketConnection::Impl(client_socket));
+  return TcpSocketConnection(client_socket);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// utils::TcpServerSocket
 ////////////////////////////////////////////////////////////////////////////////
 
-utils::TcpServerSocket::TcpServerSocket()
-    : impl_(new TcpServerSocket::Impl()) {}
+utils::TcpServerSocket::TcpServerSocket() {
+}
 
 utils::TcpServerSocket::~TcpServerSocket() {
-  delete impl_;
 }
 
 bool utils::TcpServerSocket::IsListening() const {
   return impl_->IsListening();
 }
 
-bool utils::TcpServerSocket::Close() {
-  return impl_->Close();
+void utils::TcpServerSocket::Close() {
+  impl_->Close();
 }
 
 bool utils::TcpServerSocket::Listen(const std::string& address,
-                                    int port,
-                                    int backlog) {
+                                    uint16_t port,
+                                    uint16_t backlog) {
   return impl_->Listen(address, port, backlog);
 }
 

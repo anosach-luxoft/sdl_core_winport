@@ -53,6 +53,7 @@ utils::Pimpl<Impl>::~Pimpl() {
 template <typename Impl>
 utils::Pimpl<Impl>& utils::Pimpl<Impl>::operator=(utils::Pimpl<Impl>& rhs) {
   Swap(rhs);
+  return *this;
 }
 
 template <typename Impl>
