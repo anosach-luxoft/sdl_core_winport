@@ -182,28 +182,27 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR})
 set(ARCHIVE_OUTPUT_DIRECTORY ./bin)
 
 if(MSVC)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP /GF /GR /EHsc /W3 /D_CONSOLE")
-  # /WD4996 - disable warning C4996.
-  # 'inet_ntoa': Use inet_ntop() or InetNtop() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS
-  # to disable deprecated API warnings
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4996")
-  # /WD4503 - disable warning C4503.
-  # xmemory0(592): warning C4503: 'std::_Tree<std::_Tmap_traits<_Kty,_Ty,_Pr,_Alloc,false>>::_Insert_nohint' :
-  # decorated name length exceeded, name was truncated
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4503")
-  if(QT_PORT)
-    #Add MSVS 2010 for Qt specific flags
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DWIN32")
-  else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DWIN64 /Zc:wchar_t /favor:blend")# Add MSVS specific flags
-  endif()
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD -DNDEBUG")
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd -DDEBUG")
-
-  # /NOLOGO option prevents display of the copyright message and version number
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /nologo")
-
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP /GF /GR /EHsc /W3 /WX /D_CONSOLE /favor:blend")
+  # Suppress some MSVC warnings
+  # C4200 - zero-sized array in struct/union
+  # C4244, C4267 - converting integer type to smaller integer type
+  # C4250 - inheritance via dominance
+  # C4503 - too long name length
+  # C4996 - deprecated functions usage
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4200 /wd4244 /wd4267 /wd4250 /wd4503 /wd4996")
+  # Suppress secure warnings
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+  if(QT_PORT)
+    # Set Win32 architecture for Qt build
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DWIN32")
+    # /NOLOGO option prevents display of the Qt copyright message
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /nologo")
+  else()
+    # Set Win64 architecture for Windows native build
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DWIN64")
+  endif()
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD -DNDEBUG /O2")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MDd -DDEBUG")
 else()
   set(CMAKE_CXX_FLAGS "-fPIC -std=gnu++0x -Wall -Werror -Wuninitialized -Wvla")
   if(ENABLE_SANITIZE)
@@ -224,7 +223,6 @@ if(QT_PORT)
     ${Qt5Core_INCLUDE_DIRS}
     ${Qt5Network_INCLUDE_DIRS})
 endif ()
-
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_definitions(-DOS_LINUX)
