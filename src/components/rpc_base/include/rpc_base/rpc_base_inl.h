@@ -63,11 +63,13 @@ T Range<T>::max() const {
   return max_;
 }
 
+#pragma warning(push, 0)
 template <typename T>
 template <typename U>
 bool Range<T>::Includes(U val) const {
   return min() <= val && val <= max();
 }
+#pragma warning(pop)
 
 /*
  * PrimitiveType base class

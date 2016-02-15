@@ -41,19 +41,20 @@ log4cxx::Level GetLog4cxxLogLevel(const logger::LogLevel::Type level) {
   using namespace logger;
   switch (level) {
     case LogLevel::LL_TRACE:
-      return level = log4cxx::Level::getTrace();
+      return log4cxx::Level::getTrace();
     case LogLevel::LL_DEBUG:
-      return level = log4cxx::Level::getDebug();
+      return log4cxx::Level::getDebug();
     case LogLevel::LL_INFO:
-      return level = log4cxx::Level::getInfo();
+      return log4cxx::Level::getInfo();
     case LogLevel::LL_WARN:
-      return level = log4cxx::Level::getWarn();
+      return log4cxx::Level::getWarn();
     case LogLevel::LL_ERROR:
-      return level = log4cxx::Level::getError();
+      return log4cxx::Level::getError();
     case LogLevel::LL_FATAL:
-      return level = log4cxx::Level::getFatal();
+      return log4cxx::Level::getFatal();
     default:
-      NOTREACHED();
+      DCHECK(!"Unsupported logging level");
+      return log4cxx::Level::getTrace();
   }
 }
 

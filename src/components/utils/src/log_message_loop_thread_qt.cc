@@ -49,39 +49,37 @@ void LogMessageHandler::Handle(const LogMessage message) {
 
   std::string type_str;
   switch (message.level_) {
-    case LogLevel::LL_TRACE: {
+    case LogLevel::LL_TRACE:
       // Qt doesn't have the trace method
       log_func = &QMessageLogger::debug;
       type_str = "TRACE";
       break;
-    }
-    case LogLevel::LL_DEBUG: {
+    case LogLevel::LL_DEBUG:
       log_func = &QMessageLogger::debug;
       type_str = "DEBUG";
       break;
-    }
-    case LogLevel::LL_INFO: {
+    case LogLevel::LL_INFO:
       log_func = &QMessageLogger::info;
       type_str = "INFO ";
       break;
-    }
-    case LogLevel::LL_WARN: {
+    case LogLevel::LL_WARN:
       log_func = &QMessageLogger::warning;
       type_str = "WARN ";
       break;
-    }
-    case LogLevel::LL_ERROR: {
+    case LogLevel::LL_ERROR:
       // Qt doesn't have the error method
       log_func = &QMessageLogger::critical;
       type_str = "ERROR";
       break;
-    }
-    case LogLevel::LL_FATAL: {
+    case LogLevel::LL_FATAL:
       log_func = &QMessageLogger::fatal;
       type_str = "FATAL";
       break;
-    }
-    default: { NOTREACHED(); }
+    default:
+      DCHECK(!"Unsupported logging level");
+      log_func = &QMessageLogger::debug;
+      type_str = "TRACE";
+      break;
   }
 
   // TODO: (malirod) Don't format manually but use QT_MESSAGE_PATTERN or

@@ -658,7 +658,7 @@ void TransportManagerImpl::OnDeviceListUpdated(TransportAdapter* ta) {
   LOGGER_TRACE(logger_, "exit");
 }
 
-void TransportManagerImpl::Handle(TransportAdapterEvent event) {
+void TransportManagerImpl::Handle(const TransportAdapterEvent event) {
   LOGGER_TRACE(logger_, "enter");
   switch (event.event_type) {
     case TransportAdapterListenerImpl::EventTypeEnum::ON_SEARCH_DONE: {
@@ -888,7 +888,7 @@ void TransportManagerImpl::SetTimeMetricObserver(TMMetricObserver* observer) {
 }
 #endif  // TIME_TESTER
 
-void TransportManagerImpl::Handle(::protocol_handler::RawMessagePtr msg) {
+void TransportManagerImpl::Handle(const ::protocol_handler::RawMessagePtr msg) {
   LOGGER_TRACE(logger_, "enter");
   sync_primitives::AutoReadLock lock(connections_lock_);
   ConnectionInternal* connection = GetConnection(msg->connection_key());

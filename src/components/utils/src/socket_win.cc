@@ -392,7 +392,7 @@ void utils::TcpSocketConnection::Impl::Wait() {
 }
 
 bool utils::TcpSocketConnection::Impl::Notify() {
-  return SetEvent(notify_event_);
+  return 0 != SetEvent(notify_event_);
 }
 
 void utils::TcpSocketConnection::Impl::SetEventHandler(

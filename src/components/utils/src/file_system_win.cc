@@ -136,8 +136,7 @@ file_system::FileSizeType file_system::FileSize(const std::string& utf8_path) {
     return 0u;
   }
 
-  FileSizeType file_size =
-      (ffd.nFileSizeHigh * (MAXDWORD + 1)) + ffd.nFileSizeLow;
+  FileSizeType file_size = (static_cast<FileSizeType>(ffd.nFileSizeHigh) << sizeof(ffd.nFileSizeLow) * 8) | ffd.nFileSizeLow;
   FindClose(find);
   return file_size;
 }
@@ -165,7 +164,7 @@ file_system::FileSizeType file_system::DirectorySize(
         size += DirectorySize(utf8_file_name);
       }
     } else {
-      size += (ffd.nFileSizeHigh * (MAXDWORD + 1)) + ffd.nFileSizeLow;
+      size += (static_cast<FileSizeType>(ffd.nFileSizeHigh) << sizeof(ffd.nFileSizeLow) * 8) | ffd.nFileSizeLow;
     }
   } while (FindNextFileW(find, &ffd) != 0);
 
@@ -389,7 +388,7 @@ const std::string file_system::ConvertPathForURL(const std::string& utf8_path) {
 
   // list of characters to be encoded from the link:
   // http://www.blooberry.com/indexdot/html/topics/urlencoding.htm
-  const std::string reserved_symbols = "$+,<>%{}|\^~[]` ";
+  const std::string reserved_symbols = "$+,<>%{}|^~[]`\\ ";
   std::string::const_iterator it_sym = reserved_symbols.begin();
   std::string::const_iterator it_sym_end = reserved_symbols.end();
 

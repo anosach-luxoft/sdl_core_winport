@@ -99,7 +99,7 @@ void ProtocolPacket::ProtocolHeader::deserialize(const uint8_t* message,
   // first 4 bits
   version = message[0] >> 4u;
   // 5th bit
-  protection_flag = message[0] & 0x08u;
+  protection_flag = 0 != (message[0] & 0x08u);
   // 6-8 bits
   frameType = message[0] & 0x07u;
 

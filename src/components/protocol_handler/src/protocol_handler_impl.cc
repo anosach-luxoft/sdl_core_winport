@@ -1076,7 +1076,7 @@ class StartSessionHandler : public security_manager::SecurityManagerListener {
       , hash_id_(hash_id)
       , service_type_(service_type) {}
   bool OnHandshakeDone(
-      const uint32_t connection_key,
+      uint32_t connection_key,
       security_manager::SSLContext::HandshakeResult result) OVERRIDE {
     if (connection_key != connection_key_) {
       return false;

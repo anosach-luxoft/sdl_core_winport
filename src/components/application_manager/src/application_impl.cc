@@ -710,7 +710,7 @@ bool ApplicationImpl::IsSubscribedToButton(
 bool ApplicationImpl::UnsubscribeFromButton(
     mobile_apis::ButtonName::eType btn_name) {
   sync_primitives::AutoLock lock(button_lock_);
-  return subscribed_buttons_.erase(btn_name);
+  return 0 != subscribed_buttons_.erase(btn_name);
 }
 
 bool ApplicationImpl::SubscribeToIVI(uint32_t vehicle_info_type) {
@@ -727,7 +727,7 @@ bool ApplicationImpl::IsSubscribedToIVI(uint32_t vehicle_info_type) const {
 
 bool ApplicationImpl::UnsubscribeFromIVI(uint32_t vehicle_info_type) {
   sync_primitives::AutoLock lock(vi_lock_);
-  return subscribed_vehicle_info_.erase(vehicle_info_type);
+  return 0 != subscribed_vehicle_info_.erase(vehicle_info_type);
 }
 
 UsageStatistics& ApplicationImpl::usage_report() {

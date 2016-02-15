@@ -3224,7 +3224,7 @@ void ApplicationManagerImpl::OnUpdateHMIAppType(
 
 ProtocolVersion ApplicationManagerImpl::SupportedSDLVersion() const {
   LOGGER_AUTO_TRACE(logger_);
-  bool heart_beat_support = profile::Profile::instance()->heart_beat_timeout();
+  bool heart_beat_support = 0 != profile::Profile::instance()->heart_beat_timeout();
   bool sdl4_support = profile::Profile::instance()->enable_protocol_4();
 
   if (sdl4_support) {

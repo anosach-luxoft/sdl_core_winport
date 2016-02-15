@@ -55,7 +55,7 @@ void OnDriverDistractionNotification::Run() {
   const hmi_apis::Common_DriverDistractionState::eType state =
       static_cast<hmi_apis::Common_DriverDistractionState::eType>(
           (*message_)[strings::msg_params][hmi_notification::state].asInt());
-  ApplicationManagerImpl::instance()->set_driver_distraction(state);
+  ApplicationManagerImpl::instance()->set_driver_distraction(0 != state);
 
   smart_objects::SmartObjectSPtr on_driver_distraction =
       new smart_objects::SmartObject();

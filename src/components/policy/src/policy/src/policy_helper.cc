@@ -477,7 +477,7 @@ bool CheckAppPolicy::IsRequestTypeChanged(
                       app_policy.second.RequestType->begin(),
                       app_policy.second.RequestType->end(),
                       std::back_inserter(diff));
-  return diff.size();
+  return 0 != diff.size();
 }
 
 FillNotificationData::FillNotificationData(Permissions& data,

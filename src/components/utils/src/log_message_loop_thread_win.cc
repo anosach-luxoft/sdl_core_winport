@@ -57,7 +57,8 @@ std::string GetLogTypeStringByLevel(const logger::LogLevel::Type level) {
     case LogLevel::LL_FATAL:
       return "FATAL";
     default:
-      NOTREACHED();
+      DCHECK(!"Unsupported logging level");
+      return "TRACE";
   }
 }
 

@@ -67,7 +67,7 @@ void TcpClientListener::Terminate() {
 }
 
 bool TcpClientListener::IsInitialised() const {
-  return thread_;
+  return NULL != thread_;
 }
 
 TcpClientListener::~TcpClientListener() {
