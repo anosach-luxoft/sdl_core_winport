@@ -53,6 +53,11 @@ typedef LPSTR PTSTR;
 #pragma warning(disable:4100) // unreferenced formal parameter
 #pragma warning(disable:4214) // bit field types other than int
 #pragma warning(disable:4201) // nameless struct/union
+#pragma warning(disable:4267) // conversion from 'size_t' to 'unsigned int'
+#pragma warning(disable:4244) // conversion from '__int64' to 'unsigned int'
+#pragma warning(disable:4018) // signed/unsigned mismatch
+#pragma warning(disable:4996) // deprecated functions usage
+#pragma warning(disable:4200) // zero-sized array in struct/union
 #endif
 
 // Missing from MSVC6 setupapi.h
