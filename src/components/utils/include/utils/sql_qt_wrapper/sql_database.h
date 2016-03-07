@@ -101,6 +101,8 @@ class SQLDatabase {
    */
   std::string databasename_;
 
+  const std::string connection_name_;
+
   /**
    * The last error that occurred on the database
    */

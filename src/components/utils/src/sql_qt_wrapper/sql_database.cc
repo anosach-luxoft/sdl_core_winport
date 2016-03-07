@@ -2,16 +2,25 @@
 
 #include <QSqlError>
 
+#include "utils/string_utils.h"
+
+namespace {
+const size_t kConnectionNameLength = 5;
+}  // namespace
+
 namespace utils {
 namespace dbms {
 
 SQLDatabase::SQLDatabase(const std::string& filename)
-    : databasename_(filename) {
-  db_ = QSqlDatabase::addDatabase("QSQLITE");
+    : databasename_(filename)
+    , connection_name_(utils::GenerateRandomString(kConnectionNameLength)) {
+  db_ = QSqlDatabase::addDatabase(QString("QSQLITE"),
+                                  QString(connection_name_.c_str()));
 }
 
 SQLDatabase::~SQLDatabase() {
   Close();
+  QSqlDatabase::removeDatabase(QString(connection_name_.c_str()));
 }
 
 bool SQLDatabase::Open() {
