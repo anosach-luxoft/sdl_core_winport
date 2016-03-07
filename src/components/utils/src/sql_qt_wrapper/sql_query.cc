@@ -67,6 +67,7 @@ SQLQuery::SQLQuery(SQLDatabase* db)
     : db_(db), query_(static_cast<QSqlDatabase>(*db_)), queries_cache_() {}
 
 SQLQuery::~SQLQuery() {
+  Finalize();
   db_->Close();
   /*
    * All database queries and connections should be destroyed
@@ -78,6 +79,7 @@ SQLQuery::~SQLQuery() {
 }
 
 bool SQLQuery::Prepare(const std::string& query) {
+  Finalize();
   const QStringList& list = SplitQuery(query);
   if (1 == list.size()) {
     return query_.prepare(list[0]);
