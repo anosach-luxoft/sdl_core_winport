@@ -35,7 +35,9 @@ bool SQLDatabase::Open() {
 }
 
 void SQLDatabase::Close() {
-  db_.close();
+  if (db_.isOpen()) {
+    db_.close();
+  }
 }
 
 bool SQLDatabase::BeginTransaction() {
