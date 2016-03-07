@@ -52,10 +52,6 @@ bool SQLDatabase::HasErrors() const {
   return db_.lastError().type() != QSqlError::NoError;
 }
 
-void SQLDatabase::set_path(const std::string& path) {
-  databasename_ = path + databasename_;
-}
-
 std::string SQLDatabase::get_path() const {
   return databasename_;
 }

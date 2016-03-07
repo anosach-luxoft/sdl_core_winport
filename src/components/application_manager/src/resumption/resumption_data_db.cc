@@ -55,13 +55,12 @@ namespace resumption {
 CREATE_LOGGERPTR_GLOBAL(logger_, "ResumptionDataDB")
 
 ResumptionDataDB::ResumptionDataDB()
+#if defined(__QNX__)
     : db_(new utils::dbms::SQLDatabase(kDatabaseName)) {
-#ifndef __QNX__
-  std::string path = profile::Profile::instance()->app_storage_folder();
-  if (!path.empty()) {
-    db_->set_path(path + file_system::GetPathDelimiter());
-  }
-#endif  // __QNX__
+#else
+    : db_(new utils::dbms::SQLDatabase(file_system::ConcatPath(
+          profile::Profile::instance()->app_storage_folder(), kDatabaseName))) {
+#endif
 }
 
 ResumptionDataDB::~ResumptionDataDB() {
@@ -2694,9 +2693,17 @@ void ResumptionDataDB::WriteDb() {
 }
 
 utils::dbms::SQLDatabase* ResumptionDataDB::db() const {
-#ifdef __QNX__
+#if defined(__QNX__)
   utils::dbms::SQLDatabase* db = new utils::dbms::SQLDatabase(kDatabaseName);
-  db->Open();
+  const bool open_result = db->Open();
+  DCHECK(open_result);
+  return db;
+#elif defined(QT_PORT)
+  utils::dbms::SQLDatabase* db =
+      new utils::dbms::SQLDatabase(file_system::ConcatPath(
+          profile::Profile::instance()->app_storage_folder(), kDatabaseName));
+  const bool open_result = db->Open();
+  DCHECK(open_result);
   return db;
 #else
   return db_;

@@ -73,15 +73,15 @@ const std::string SQLPTRepresentation::kDatabaseName = "policy";
 SQLPTRepresentation::SQLPTRepresentation(const std::string& app_storage_folder,
                                          uint16_t attempts_to_open_policy_db,
                                          uint16_t open_attempt_timeout_ms)
+#if defined(__QNX__)
     : db_(new utils::dbms::SQLDatabase(kDatabaseName))
+#else
+    : db_(new utils::dbms::SQLDatabase(
+          file_system::ConcatPath(app_storage_folder, kDatabaseName)))
+#endif
     , app_storage_folder_(app_storage_folder)
     , attempts_to_open_policy_db_(attempts_to_open_policy_db)
     , open_attempt_timeout_ms_(open_attempt_timeout_ms) {
-#ifndef __QNX__
-  if (!app_storage_folder_.empty()) {
-    db_->set_path(app_storage_folder_ + file_system::GetPathDelimiter());
-  }
-#endif  // __QNX__
 }
 
 SQLPTRepresentation::~SQLPTRepresentation() {
@@ -1611,9 +1611,17 @@ const int32_t SQLPTRepresentation::GetDBVersion() const {
 }
 
 utils::dbms::SQLDatabase* SQLPTRepresentation::db() const {
-#ifdef __QNX__
+#if defined(__QNX__)
   utils::dbms::SQLDatabase* db = new utils::dbms::SQLDatabase(kDatabaseName);
-  db->Open();
+  const bool open_result = db->Open();
+  DCHECK(open_result);
+  return db;
+#elif defined(QT_PORT)
+  utils::dbms::SQLDatabase* db =
+      new utils::dbms::SQLDatabase(file_system::ConcatPath(
+          app_storage_folder_, kDatabaseName));
+  const bool open_result = db->Open();
+  DCHECK(open_result);
   return db;
 #else
   return db_;

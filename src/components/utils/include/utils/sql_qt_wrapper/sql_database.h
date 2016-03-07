@@ -63,12 +63,6 @@ class SQLDatabase {
   bool HasErrors() const;
 
   /**
-   * Sets path to database
-   * If the database is already opened then need reopen it
-   */
-  void set_path(const std::string& path);
-
-  /**
    * @brief get_path databse location path.
    *
    * @return the path to the database location
@@ -99,8 +93,11 @@ class SQLDatabase {
   /**
    * The filename of database
    */
-  std::string databasename_;
+  const std::string databasename_;
 
+  /**
+   * The name of database connection
+   */
   const std::string connection_name_;
 
   /**
