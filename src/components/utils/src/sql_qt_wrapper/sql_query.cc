@@ -64,9 +64,12 @@ void PreparePullValue(QSqlQuery& query) {
 }  // namespace
 
 SQLQuery::SQLQuery(SQLDatabase* db)
-    : query_(static_cast<QSqlDatabase>(*db)), queries_cache_() {}
+    : db_(db), query_(static_cast<QSqlDatabase>(*db_)), queries_cache_() {}
 
-SQLQuery::~SQLQuery() {}
+SQLQuery::~SQLQuery() {
+  db_->Close();
+  delete db_;
+}
 
 bool SQLQuery::Prepare(const std::string& query) {
   const QStringList& list = SplitQuery(query);

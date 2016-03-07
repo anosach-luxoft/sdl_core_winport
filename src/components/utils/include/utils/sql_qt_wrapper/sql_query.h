@@ -210,6 +210,8 @@ class SQLQuery {
    */
   QStringList SplitQuery(const std::string& query) const;
 
+  SQLDatabase* db_;
+
   QSqlQuery query_;
   QStringList queries_cache_;
 };
