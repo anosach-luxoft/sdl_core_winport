@@ -47,6 +47,8 @@ std::string ReplaceString(std::string str,
 std::string Trim(const std::string& value,
                  const std::string& whitespace = " \t");
 
+std::string GenerateRandomString(size_t length);
+
 }  // namespace utils
 
 #endif  // SRC_COMPONENTS_UTILS_INCLUDE_UTILS_STRING_UTILS_H_

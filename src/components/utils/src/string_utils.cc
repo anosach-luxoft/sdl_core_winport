@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <algorithm>
 
@@ -63,4 +64,17 @@ std::string utils::Trim(const std::string& value,
   const std::size_t range = end - begin + 1;
 
   return value.substr(begin, range);
+}
+
+std::string utils::GenerateRandomString(size_t length) {
+  const std::string charset =
+      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+  std::string result;
+  result.resize(length);
+
+  for (size_t i = 0; i < length; ++i) {
+    result[i] = charset[rand() % charset.length()];
+  }
+
+  return result;
 }

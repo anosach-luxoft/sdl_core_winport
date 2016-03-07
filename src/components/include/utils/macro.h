@@ -41,6 +41,8 @@
 
 #if defined(QT_PORT)
 #include <QCoreApplication>
+#include <cstdlib>
+#include <ctime>
 #endif
 
 // A macro to set some action for variable to avoid "unused variable" warning
@@ -156,7 +158,8 @@ extern Q_CORE_EXPORT int qt_ntfs_permission_lookup;
   qt_ntfs_permission_lookup++;                       \
   QCoreApplication application(argc, argv);          \
   QThreadPool* pool = QThreadPool::globalInstance(); \
-  pool->setMaxThreadCount(100)
+  pool->setMaxThreadCount(100);                      \
+  srand(static_cast<unsigned int>(time(NULL)));
 #else
 #define PLATFORM_INIT(argc, argv)
 #endif
