@@ -68,6 +68,12 @@ SQLQuery::SQLQuery(SQLDatabase* db)
 
 SQLQuery::~SQLQuery() {
   db_->Close();
+  /*
+   * All database queries and connections should be destroyed
+   * before database removing. See
+   * http://doc.qt.io/qt-5/qsqldatabase.html#removeDatabase
+   */
+  query_ = QSqlQuery();
   delete db_;
 }
 

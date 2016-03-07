@@ -20,6 +20,12 @@ SQLDatabase::SQLDatabase(const std::string& filename)
 
 SQLDatabase::~SQLDatabase() {
   Close();
+  /*
+   * All database queries and connections should be destroyed
+   * before database removing. See
+   * http://doc.qt.io/qt-5/qsqldatabase.html#removeDatabase
+   */
+  db_ = QSqlDatabase();
   QSqlDatabase::removeDatabase(QString(connection_name_.c_str()));
 }
 
