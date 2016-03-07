@@ -85,10 +85,6 @@ class SQLDatabase {
  protected:
  private:
   QSqlDatabase db_;
-  /**
-   * Lock for guarding connection to database
-   */
-  sync_primitives::Lock conn_lock_;
 
   /**
    * The filename of database
