@@ -503,38 +503,43 @@ void SQLPTRepresentation::GatherModuleMeta(
 void SQLPTRepresentation::GatherModuleConfig(
     policy_table::ModuleConfig* config) const {
   LOGGER_INFO(logger_, "Gather Configuration Info");
-  Query query(db());
-  if (!query.Prepare(sql_pt::kSelectModuleConfig) || !query.Next()) {
-    LOGGER_WARN(logger_, "Incorrect select statement for module config");
-  } else {
-    *config->preloaded_pt = query.GetBoolean(0);
-    config->exchange_after_x_ignition_cycles = query.GetInteger(1);
-    config->exchange_after_x_kilometers = query.GetInteger(2);
-    config->exchange_after_x_days = query.GetInteger(3);
-    config->timeout_after_x_seconds = query.GetInteger(4);
-    *config->certificate = query.GetString(5);
-    *config->vehicle_make = query.GetString(6);
-    *config->vehicle_model = query.GetString(7);
-    *config->vehicle_year = query.GetString(8);
-  }
-
-  Query endpoints(db());
-  if (!endpoints.Prepare(sql_pt::kSelectEndpoints)) {
-    LOGGER_WARN(logger_, "Incorrect select statement for endpoints");
-  } else {
-    while (endpoints.Next()) {
-      config->endpoints[endpoints.GetString(1)][endpoints.GetString(2)]
-          .push_back(endpoints.GetString(0));
+  {
+    Query query(db());
+    if (!query.Prepare(sql_pt::kSelectModuleConfig) || !query.Next()) {
+      LOGGER_WARN(logger_, "Incorrect select statement for module config");
+    } else {
+      *config->preloaded_pt = query.GetBoolean(0);
+      config->exchange_after_x_ignition_cycles = query.GetInteger(1);
+      config->exchange_after_x_kilometers = query.GetInteger(2);
+      config->exchange_after_x_days = query.GetInteger(3);
+      config->timeout_after_x_seconds = query.GetInteger(4);
+      *config->certificate = query.GetString(5);
+      *config->vehicle_make = query.GetString(6);
+      *config->vehicle_model = query.GetString(7);
+      *config->vehicle_year = query.GetString(8);
     }
   }
-
-  Query notifications(db());
-  if (!notifications.Prepare(sql_pt::kSelectNotificationsPerMin)) {
-    LOGGER_WARN(logger_, "Incorrect select statement for notifications");
-  } else {
-    while (notifications.Next()) {
-      config->notifications_per_minute_by_priority[notifications.GetString(0)] =
-          notifications.GetInteger(1);
+  {
+    Query endpoints(db());
+    if (!endpoints.Prepare(sql_pt::kSelectEndpoints)) {
+      LOGGER_WARN(logger_, "Incorrect select statement for endpoints");
+    } else {
+      while (endpoints.Next()) {
+        config->endpoints[endpoints.GetString(1)][endpoints.GetString(2)]
+            .push_back(endpoints.GetString(0));
+      }
+    }
+  }
+  {
+    Query notifications(db());
+    if (!notifications.Prepare(sql_pt::kSelectNotificationsPerMin)) {
+      LOGGER_WARN(logger_, "Incorrect select statement for notifications");
+    } else {
+      while (notifications.Next()) {
+        config
+            ->notifications_per_minute_by_priority[notifications.GetString(0)] =
+            notifications.GetInteger(1);
+      }
     }
   }
   Query seconds(db());
@@ -730,12 +735,13 @@ bool SQLPTRepresentation::Save(const policy_table::Table& table) {
 
 bool SQLPTRepresentation::SaveFunctionalGroupings(
     const policy_table::FunctionalGroupings& groups) {
-  Query query_delete(db());
-  if (!query_delete.Exec(sql_pt::kDeleteRpc)) {
-    LOGGER_WARN(logger_, "Incorrect delete from rpc.");
-    return false;
+  {
+    Query query_delete(db());
+    if (!query_delete.Exec(sql_pt::kDeleteRpc)) {
+      LOGGER_WARN(logger_, "Incorrect delete from rpc.");
+      return false;
+    }
   }
-
   Query query(db());
   if (!query.Exec(sql_pt::kDeleteFunctionalGroup)) {
     LOGGER_WARN(logger_, "Incorrect delete from seconds between retries.");
@@ -1617,9 +1623,8 @@ utils::dbms::SQLDatabase* SQLPTRepresentation::db() const {
   DCHECK(open_result);
   return db;
 #elif defined(QT_PORT)
-  utils::dbms::SQLDatabase* db =
-      new utils::dbms::SQLDatabase(file_system::ConcatPath(
-          app_storage_folder_, kDatabaseName));
+  utils::dbms::SQLDatabase* db = new utils::dbms::SQLDatabase(
+      file_system::ConcatPath(app_storage_folder_, kDatabaseName));
   const bool open_result = db->Open();
   DCHECK(open_result);
   return db;
@@ -1630,15 +1635,25 @@ utils::dbms::SQLDatabase* SQLPTRepresentation::db() const {
 
 bool SQLPTRepresentation::CopyApplication(const std::string& source,
                                           const std::string& destination) {
-  Query source_app(db());
-  if (!source_app.Prepare(sql_pt::kSelectApplicationFull)) {
-    LOGGER_WARN(logger_, "Incorrect select statement from application.");
-    return false;
-  }
-  source_app.Bind(0, source);
-  if (!source_app.Exec()) {
-    LOGGER_WARN(logger_, "Failed selecting from application.");
-    return false;
+  std::vector<uint8_t> full_apps;
+  {
+    Query source_app(db());
+    if (!source_app.Prepare(sql_pt::kSelectApplicationFull)) {
+      LOGGER_WARN(logger_, "Incorrect select statement from application.");
+      return false;
+    }
+    source_app.Bind(0, source);
+    if (!source_app.Exec()) {
+      LOGGER_WARN(logger_, "Failed selecting from application.");
+      return false;
+    }
+    for (size_t i = 0; i < 10; ++i) {
+      if (!source_app.IsNull(i)) {
+        full_apps.push_back(source_app.GetBoolean(0) ? 1 : 0);
+      } else {
+        full_apps.push_back(2);
+      }
+    }
   }
 
   Query query(db());
@@ -1649,20 +1664,34 @@ bool SQLPTRepresentation::CopyApplication(const std::string& source,
   query.Bind(0, destination);
   source_app.IsNull(0) ? query.Bind(1)
                        : query.Bind(1, source_app.GetBoolean(0));
+
   source_app.IsNull(1) ? query.Bind(2)
                        : query.Bind(2, source_app.GetBoolean(1));
-  source_app.IsNull(2) ? query.Bind(3) : query.Bind(3, source_app.GetString(2));
-  source_app.IsNull(3) ? query.Bind(4) : query.Bind(4, source_app.GetString(3));
+
+  source_app.IsNull(2) ? query.Bind(3)
+                       : query.Bind(3, source_app.GetBoolean(2));
+
+  source_app.IsNull(3) ? query.Bind(4)
+                       : query.Bind(4, source_app.GetBoolean(3));
+
   source_app.IsNull(4) ? query.Bind(5)
                        : query.Bind(5, source_app.GetBoolean(4));
+
   source_app.IsNull(5) ? query.Bind(6)
                        : query.Bind(6, source_app.GetBoolean(5));
+
   source_app.IsNull(6) ? query.Bind(7)
                        : query.Bind(7, source_app.GetBoolean(6));
-  query.Bind(8, source_app.GetInteger(7));
-  query.Bind(9, source_app.GetInteger(8));
+
+  source_app.IsNull(7) ? query.Bind(8)
+                       : query.Bind(8, source_app.GetBoolean(7));
+
+  source_app.IsNull(8) ? query.Bind(9)
+                       : query.Bind(9, source_app.GetBoolean(8));
+
   source_app.IsNull(9) ? query.Bind(10)
-                       : query.Bind(10, source_app.GetString(9));
+                       : query.Bind(10, source_app.GetBoolean(9));
+
   if (!query.Exec()) {
     LOGGER_WARN(logger_, "Failed inserting into application.");
     return false;
