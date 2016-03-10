@@ -264,7 +264,7 @@ class ResumptionDataDB : public ResumptionData {
    * @param device_id - contains id of device on which is running application
    * @param hmi_id - will contains hmi id from saved application
    */
-  void SelectHMIId(const std::string& policy_app_id,
+  bool SelectHMIId(const std::string& policy_app_id,
                    const std::string& device_id,
                    uint32_t& hmi_id) const;
 

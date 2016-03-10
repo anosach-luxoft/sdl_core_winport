@@ -121,22 +121,29 @@ bool ResumptionDataDB::Init() {
     return false;
   }
 #endif  // __QNX__
-  utils::dbms::SQLQuery query(db());
-  if (!query.Exec(kCreateSchema)) {
-    LOGGER_ERROR(
-        logger_,
-        "Failed creating schema of database: " << query.LastError().text());
-    return false;
+  {
+    utils::dbms::SQLQuery query(db());
+    if (!query.Exec(kCreateSchema)) {
+      LOGGER_ERROR(
+          logger_,
+          "Failed creating schema of database: " << query.LastError().text());
+      return false;
+    }
   }
-  utils::dbms::SQLQuery query_checks_resumption(db());
-  if (!query_checks_resumption.Prepare(kChecksResumptionData) ||
-      !query_checks_resumption.Exec()) {
-    LOGGER_ERROR(logger_,
-                 "Failed verification or execution query kChecksResumptionData"
-                     << query_checks_resumption.LastError().text());
-    return false;
+  int check_resumption = -1;
+  {
+    utils::dbms::SQLQuery query_checks_resumption(db());
+    if (!query_checks_resumption.Prepare(kChecksResumptionData) ||
+        !query_checks_resumption.Exec()) {
+      LOGGER_ERROR(
+          logger_,
+          "Failed verification or execution query kChecksResumptionData"
+              << query_checks_resumption.LastError().text());
+      return false;
+    }
+    check_resumption = query_checks_resumption.GetInteger(0);
   }
-  if (0 == query_checks_resumption.GetInteger(0)) {
+  if (0 == check_resumption) {
     utils::dbms::SQLQuery query_insert_resumption(db());
     if (!query_insert_resumption.Prepare(kInsertInitData) ||
         !query_insert_resumption.Exec()) {
@@ -145,8 +152,11 @@ bool ResumptionDataDB::Init() {
                        << query_insert_resumption.LastError().text());
       return false;
     }
+  } else if (check_resumption > 0) {
+    return true;
+  } else {
+    return false;
   }
-  return true;
 }
 
 void ResumptionDataDB::SaveApplication(
@@ -247,21 +257,22 @@ uint32_t ResumptionDataDB::GetHMIApplicationID(
     const std::string& policy_app_id, const std::string& device_id) const {
   LOGGER_AUTO_TRACE(logger_);
   uint32_t hmi_app_id = 0;
-  SelectHMIId(policy_app_id, device_id, hmi_app_id);
+  if (!SelectHMIId(policy_app_id, device_id, hmi_app_id)) {
+    LOGGER_FATAL(logger_,
+                 "Saved data doesn't have application with "
+                 "device id = "
+                     << device_id << " and policy appID = " << policy_app_id);
+  }
   return hmi_app_id;
 }
 
 void ResumptionDataDB::OnSuspend() {
   LOGGER_AUTO_TRACE(logger_);
-
-  utils::dbms::SQLQuery query_update_suspend_data(db());
-  utils::dbms::SQLQuery query_update_last_ign_off_time(db());
   /*
     application_lifes - contains amount of ignition cycles during which
     db stores data of application
    */
   const int application_lifes = 3;
-
   if (DeleteAppWithIgnCount(application_lifes)) {
     LOGGER_INFO(logger_,
                 "Saved application with ign_off_count = " << application_lifes
@@ -269,17 +280,22 @@ void ResumptionDataDB::OnSuspend() {
   } else {
     LOGGER_WARN(logger_, "Problem with removing applications");
   }
-
-  if (query_update_suspend_data.Prepare(kUpdateSuspendData)) {
-    if (query_update_suspend_data.Exec()) {
-      LOGGER_INFO(logger_, "Data ign_off_count and suspend_count were updated");
+  {
+    utils::dbms::SQLQuery query_update_suspend_data(db());
+    if (query_update_suspend_data.Prepare(kUpdateSuspendData)) {
+      if (query_update_suspend_data.Exec()) {
+        LOGGER_INFO(logger_,
+                    "Data ign_off_count and suspend_count were updated");
+      }
     }
   }
-
-  if (query_update_last_ign_off_time.Prepare(KUpdateLastIgnOffTime)) {
-    query_update_last_ign_off_time.Bind(0, static_cast<int64_t>(time(NULL)));
-    if (query_update_last_ign_off_time.Exec()) {
-      LOGGER_INFO(logger_, "Data last_ign_off_time was updated");
+  {
+    utils::dbms::SQLQuery query_update_last_ign_off_time(db());
+    if (query_update_last_ign_off_time.Prepare(KUpdateLastIgnOffTime)) {
+      query_update_last_ign_off_time.Bind(0, static_cast<int64_t>(time(NULL)));
+      if (query_update_last_ign_off_time.Exec()) {
+        LOGGER_INFO(logger_, "Data last_ign_off_time was updated");
+      }
     }
   }
   WriteDb();
@@ -287,37 +303,46 @@ void ResumptionDataDB::OnSuspend() {
 
 bool ResumptionDataDB::DeleteAppWithIgnCount(const int application_lifes) {
   LOGGER_AUTO_TRACE(logger_);
-  utils::dbms::SQLQuery select_apps_for_removing(db());
-  utils::dbms::SQLQuery count_app(db());
+  {
+    utils::dbms::SQLQuery count_app(db());
+    if (!count_app.Prepare(kCountApplicationsIgnOff)) {
+      LOGGER_WARN(logger_, "Problem with verification query count_app");
+      return false;
+    }
+    /* Positions of binding data for "query count_app" :
+      field "ign_off_count" from table "application" = 0*/
+    count_app.Bind(0, application_lifes);
+    if (!count_app.Exec() || !count_app.GetInteger(0)) {
+      LOGGER_WARN(logger_, "Problem with execution or count app=0");
+      return false;
+    }
+  }
 
-  if (!select_apps_for_removing.Prepare(kSelectApplicationsIgnOffCount) ||
-      !count_app.Prepare(kCountApplicationsIgnOff)) {
-    LOGGER_WARN(logger_,
-                "Problem with verification query select_apps_for_removing or"
-                " query count_app");
-    return false;
+  std::vector<std::string> device_id_vector;
+  std::vector<std::string> policy_app_id_vector;
+  {
+    utils::dbms::SQLQuery select_apps_for_removing(db());
+    if (!select_apps_for_removing.Prepare(kSelectApplicationsIgnOffCount)) {
+      LOGGER_WARN(logger_,
+                  "Problem with verification query select_apps_for_removing");
+      return false;
+    }
+    /* Positions of binding data for "select_apps_for_removing" :
+       field "ign_off_count" from table "application" = 0*/
+    select_apps_for_removing.Bind(0, application_lifes);
+    while (select_apps_for_removing.Next()) {
+      device_id_vector.push_back(select_apps_for_removing.GetString(0));
+      policy_app_id_vector.push_back(select_apps_for_removing.GetString(1));
+    }
   }
-  /* Positions of binding data for "query count_app" :
-    field "ign_off_count" from table "application" = 0*/
-  count_app.Bind(0, application_lifes);
-  if (!count_app.Exec() || !count_app.GetInteger(0)) {
-    LOGGER_WARN(logger_, "Problem with execution or count app=0");
-    return false;
-  }
-  std::string policy_app_id;
-  std::string device_id;
-  /* Positions of binding data for "select_apps_for_removing" :
-     field "ign_off_count" from table "application" = 0*/
-  select_apps_for_removing.Bind(0, application_lifes);
-  while (select_apps_for_removing.Next()) {
-    device_id = select_apps_for_removing.GetString(0);
-    policy_app_id = select_apps_for_removing.GetString(1);
-    if (!DeleteSavedApplication(policy_app_id, device_id)) {
+
+  for (size_t i = 0; i < device_id_vector.size(); ++i) {
+    if (!DeleteSavedApplication(policy_app_id_vector[i], device_id_vector[i])) {
       LOGGER_WARN(logger_, "Problem with removing application data");
       return false;
     }
   }
-  LOGGER_WARN(logger_, "Applications data were removed successfully");
+  LOGGER_INFO(logger_, "Applications data ha removed successfully");
   WriteDb();
   return true;
 }
@@ -437,26 +462,34 @@ bool ResumptionDataDB::SelectHMILevel(const std::string& policy_app_id,
                                       const std::string& device_id,
                                       int& hmi_level) const {
   LOGGER_AUTO_TRACE(logger_);
-  utils::dbms::SQLQuery query_count(db());
-  utils::dbms::SQLQuery query_select(db());
-  if (query_count.Prepare(kSelectCountHMILevel) &&
-      query_select.Prepare(kSelectHMILevel)) {
-    /* Positions of binding data for "query_count" and "query_select" :
-       field "deviceID" from table "application" = 0
-       field "appID" from table "application" = 1 */
+  /* Positions of binding data for "query_count" and "query_select" :
+     field "deviceID" from table "application" = 0
+     field "appID" from table "application" = 1 */
+  {
+    utils::dbms::SQLQuery query_count(db());
+    if (!query_count.Prepare(kSelectCountHMILevel)) {
+      return false;
+    }
     query_count.Bind(0, device_id);
     query_count.Bind(1, policy_app_id);
-    query_select.Bind(0, device_id);
-    query_select.Bind(1, policy_app_id);
-    /* Position of data in "query_select" :
-       field "hmiLevel" from table "application" = 0 */
-    if (query_count.Exec() && query_count.GetInteger(0) &&
-        query_select.Exec()) {
-      hmi_level = query_select.GetInteger(0);
-      return true;
+    if (!query_count.Exec() || !query_count.GetInteger(0)) {
+      return false;
     }
   }
-  return false;
+
+  utils::dbms::SQLQuery query_select(db());
+  if (!query_select.Prepare(kSelectHMILevel)) {
+    return false;
+  }
+  query_select.Bind(0, device_id);
+  query_select.Bind(1, policy_app_id);
+  /* Position of data in "query_select" :
+     field "hmiLevel" from table "application" = 0 */
+  if (!query_select.Exec()) {
+    return false;
+  }
+  hmi_level = query_select.GetInteger(0);
+  return true;
 }
 
 bool ResumptionDataDB::CheckExistenceHMIId(uint32_t hmi_app_id) const {
@@ -475,69 +508,83 @@ bool ResumptionDataDB::CheckExistenceHMIId(uint32_t hmi_app_id) const {
   return false;
 }
 
-void ResumptionDataDB::SelectHMIId(const std::string& policy_app_id,
+bool ResumptionDataDB::SelectHMIId(const std::string& policy_app_id,
                                    const std::string& device_id,
                                    uint32_t& hmi_id) const {
   LOGGER_AUTO_TRACE(logger_);
-
-  utils::dbms::SQLQuery query_select(db());
-  utils::dbms::SQLQuery query_check(db());
   /* Positions of binding data for "query_select" and "query_check" :
      field "deviceID" from table "application" = 0
      field "appID" from table "application" = 1 */
-  if (query_select.Prepare(kSelectHMIId) &&
-      query_check.Prepare(kSelectCountHMIId)) {
-    query_select.Bind(0, device_id);
-    query_select.Bind(1, policy_app_id);
+  {
+    utils::dbms::SQLQuery query_check(db());
+    if (!query_check.Prepare(kSelectCountHMIId)) {
+      return false;
+    }
     query_check.Bind(0, device_id);
     query_check.Bind(1, policy_app_id);
-    /* Position of data in "query_select" :
-       field "hmiAppID" from table "application" = 0 */
-    if (query_check.Exec() && query_check.GetInteger(0) &&
-        query_select.Exec()) {
-      hmi_id = query_select.GetUInteger(0);
-      LOGGER_INFO(logger_, "HMI appID = " << hmi_id);
-      return;
+    if (!query_check.Exec() || !query_check.GetInteger(0)) {
+      return false;
     }
   }
-  LOGGER_FATAL(logger_,
-               "Saved data doesn't have application with "
-               "device id = "
-                   << device_id << " and policy appID = " << policy_app_id);
+
+  utils::dbms::SQLQuery query_select(db());
+  if (!query_select.Prepare(kSelectHMIId)) {
+    return false;
+  }
+  query_select.Bind(0, device_id);
+  query_select.Bind(1, policy_app_id);
+  /* Position of data in "query_select" :
+     field "hmiAppID" from table "application" = 0 */
+  if (!query_select.Exec()) {
+    return false;
+  }
+
+  hmi_id = query_select.GetUInteger(0);
+  LOGGER_INFO(logger_, "HMI appID = " << hmi_id);
+  return true;
 }
 
 bool ResumptionDataDB::SelectHashId(const std::string& policy_app_id,
                                     const std::string& device_id,
                                     std::string& hash_id) const {
   LOGGER_AUTO_TRACE(logger_);
-  utils::dbms::SQLQuery count(db());
-  utils::dbms::SQLQuery select_hash(db());
-  if (!select_hash.Prepare(kSelectHashId) || !count.Prepare(kCountHashId)) {
-    LOGGER_WARN(logger_,
-                "Problem with verification count query or"
-                " select_hash query");
-    return false;
-  }
   /* Positions of binding data for "count" and "select_hash" :
      field "deviceID" from table "application" = 0
      field "appID" from table "application" = 1 */
-  count.Bind(0, device_id);
-  count.Bind(1, policy_app_id);
+  {
+    utils::dbms::SQLQuery count(db());
+    if (!count.Prepare(kCountHashId)) {
+      LOGGER_WARN(logger_, "Problem with verification count query");
+      return false;
+    }
+    count.Bind(0, device_id);
+    count.Bind(1, policy_app_id);
+    if (!count.Exec() || !count.GetInteger(0)) {
+      return false;
+    }
+  }
+
+  utils::dbms::SQLQuery select_hash(db());
+  if (!select_hash.Prepare(kSelectHashId)) {
+    LOGGER_WARN(logger_, "Problem with verification select_hash query");
+    return false;
+  }
   select_hash.Bind(0, device_id);
   select_hash.Bind(1, policy_app_id);
   /* Position of data in "select_hash" :
      field "hashID" from table "application" = 0 */
-  if (count.Exec() && count.GetInteger(0) && select_hash.Exec()) {
-    hash_id = select_hash.GetString(0);
-    LOGGER_INFO(logger_, "Saved hash ID = " << hash_id);
-    return true;
+  if (!select_hash.Exec()) {
+    LOGGER_WARN(logger_,
+                "Saved data doesn't have application with "
+                "device id = "
+                    << device_id << " and policy appID = " << policy_app_id
+                    << "or hashID");
+    return false;
   }
-  LOGGER_WARN(logger_,
-              "Saved data doesn't have application with "
-              "device id = "
-                  << device_id << " and policy appID = " << policy_app_id
-                  << "or hashID");
-  return false;
+
+  hash_id = select_hash.GetString(0);
+  LOGGER_INFO(logger_, "Saved hash ID = " << hash_id);
+  return true;
 }
 
 uint32_t ResumptionDataDB::SelectIgnOffTime() const {
@@ -592,23 +639,23 @@ void ResumptionDataDB::SelectDataForLoadResumeData(
   using namespace app_mngr;
   using namespace smart_objects;
   LOGGER_AUTO_TRACE(logger_);
-
+  {
+    utils::dbms::SQLQuery count_application(db());
+    if (!count_application.Prepare(kCountApplications)) {
+      LOGGER_WARN(logger_, "Problem with count application verification");
+      return;
+    }
+    if (!count_application.Exec() || !count_application.GetInteger(0)) {
+      LOGGER_WARN(logger_, "Problem with execution count_application query");
+      return;
+    }
+  }
   utils::dbms::SQLQuery select_data(db());
-  utils::dbms::SQLQuery count_application(db());
-  if (!select_data.Prepare(kSelectDataForLoadResumeData) ||
-      !count_application.Prepare(kCountApplications)) {
-    LOGGER_WARN(logger_,
-                "Problem with verification select_data query"
-                " or count application");
+  if (!select_data.Prepare(kSelectDataForLoadResumeData)) {
+    LOGGER_WARN(logger_, "Problem with verification select_data query");
     return;
   }
 
-  if (!count_application.Exec() || !count_application.GetInteger(0)) {
-    LOGGER_WARN(logger_,
-                "Problem with execution count_application query"
-                " or appliction table does not contain data");
-    return;
-  }
   SmartObject so_array_data(SmartType_Array);
   uint32_t i = 0;
   /* Position of data in "select_data" :
@@ -633,24 +680,27 @@ void ResumptionDataDB::UpdateHmiLevel(const std::string& policy_app_id,
                                       const std::string& device_id,
                                       int32_t hmi_level) {
   LOGGER_AUTO_TRACE(logger_);
-
-  utils::dbms::SQLQuery query(db());
-  /* Positions of binding data for "query":
-     field "hmiLevel" from table "application" = 0
-     field "deviceID" from table "application" = 1
-     field "appID" from table "application" = 2 */
-  if (query.Prepare(kUpdateHMILevel)) {
+  {
+    utils::dbms::SQLQuery query(db());
+    /* Positions of binding data for "query":
+       field "hmiLevel" from table "application" = 0
+       field "deviceID" from table "application" = 1
+       field "appID" from table "application" = 2 */
+    if (!query.Prepare(kUpdateHMILevel)) {
+      return;
+    }
     query.Bind(0, hmi_level);
     query.Bind(1, device_id);
     query.Bind(2, policy_app_id);
-    if (query.Exec()) {
-      LOGGER_INFO(logger_,
-                  "Saved data has application with policy appID = "
-                      << policy_app_id << " and deviceID = " << device_id
-                      << " has new HMI level = " << hmi_level);
-      WriteDb();
+    if (!query.Exec()) {
+      return;
     }
   }
+  LOGGER_INFO(logger_,
+              "Saved data has application with policy appID = "
+                  << policy_app_id << " and deviceID = " << device_id
+                  << " has new HMI level = " << hmi_level);
+  WriteDb();
 }
 
 bool ResumptionDataDB::RefreshDB() const {
@@ -677,19 +727,26 @@ bool ResumptionDataDB::RefreshDB() const {
 
 bool ResumptionDataDB::GetAllData(smart_objects::SmartObject& data) const {
   LOGGER_AUTO_TRACE(logger_);
-  utils::dbms::SQLQuery query(db());
-  if (!query.Prepare(resumption::kSelectAllApps)) {
-    LOGGER_ERROR(logger_, "Can't get applications data from DB.");
-    return false;
+
+  uint32_t index = 0;
+  std::vector<std::string> app_id_vector;
+  std::vector<std::string> device_id_vector;
+  {
+    utils::dbms::SQLQuery query(db());
+    if (!query.Prepare(resumption::kSelectAllApps)) {
+      LOGGER_ERROR(logger_, "Can't get applications data from DB.");
+      return false;
+    }
+    while (query.Next()) {
+      app_id_vector.push_back(query.GetString(0));
+      device_id_vector.push_back(query.GetString(1));
+    }
   }
 
   data = smart_objects::SmartObject(smart_objects::SmartType_Array);
-
-  uint32_t index = 0;
-  while (query.Next()) {
-    const std::string app_id = query.GetString(0);
-    const std::string device_id = query.GetString(1);
-    if (GetSavedApplication(app_id, device_id, data[index])) {
+  for (size_t i = 0; i < app_id_vector.size(); ++i) {
+    if (GetSavedApplication(
+            app_id_vector[i], device_id_vector[i], data[index])) {
       ++index;
     }
   }
@@ -1202,19 +1259,22 @@ bool ResumptionDataDB::SelectVrHelpItemsData(
   LOGGER_AUTO_TRACE(logger_);
   using namespace app_mngr;
   using namespace smart_objects;
-  utils::dbms::SQLQuery checks_vrhelp_item(db());
-  if (!checks_vrhelp_item.Prepare(kChecksVrHelpItem)) {
-    LOGGER_WARN(logger_, "Problem with verification checks_vrhelp_item query");
-    return false;
-  }
-  checks_vrhelp_item.Bind(0, global_properties_key);
-  if (!checks_vrhelp_item.Exec()) {
-    LOGGER_WARN(logger_, "Problem with execution checks_vrhelp_item query");
-    return false;
-  }
-  if (0 == checks_vrhelp_item.GetInteger(0)) {
-    LOGGER_INFO(logger_, "Global properties doesn't contain vr help item");
-    return true;
+  {
+    utils::dbms::SQLQuery checks_vrhelp_item(db());
+    if (!checks_vrhelp_item.Prepare(kChecksVrHelpItem)) {
+      LOGGER_WARN(logger_,
+                  "Problem with verification checks_vrhelp_item query");
+      return false;
+    }
+    checks_vrhelp_item.Bind(0, global_properties_key);
+    if (!checks_vrhelp_item.Exec()) {
+      LOGGER_WARN(logger_, "Problem with execution checks_vrhelp_item query");
+      return false;
+    }
+    if (0 == checks_vrhelp_item.GetInteger(0)) {
+      LOGGER_INFO(logger_, "Global properties doesn't contain vr help item");
+      return true;
+    }
   }
   utils::dbms::SQLQuery select_vrhelp_item(db());
   if (!select_vrhelp_item.Prepare(kSelectVrHelpItem)) {
@@ -1252,21 +1312,23 @@ bool ResumptionDataDB::SelectCharactersData(
   LOGGER_AUTO_TRACE(logger_);
   using namespace app_mngr;
   using namespace smart_objects;
-  utils::dbms::SQLQuery checks_characters(db());
-  if (!checks_characters.Prepare(kChecksCharacter)) {
-    LOGGER_WARN(logger_, "Problem with verification checks_characters query");
-    return false;
-  }
-  checks_characters.Bind(0, global_properties_key);
-  if (!checks_characters.Exec()) {
-    LOGGER_WARN(logger_, "Problem with execution checks_characters query");
-    return false;
-  }
-  if (0 == checks_characters.GetInteger(0)) {
-    LOGGER_INFO(
-        logger_,
-        "Keyboard properties doesn't contain table limited character list");
-    return true;
+  {
+    utils::dbms::SQLQuery checks_characters(db());
+    if (!checks_characters.Prepare(kChecksCharacter)) {
+      LOGGER_WARN(logger_, "Problem with verification checks_characters query");
+      return false;
+    }
+    checks_characters.Bind(0, global_properties_key);
+    if (!checks_characters.Exec()) {
+      LOGGER_WARN(logger_, "Problem with execution checks_characters query");
+      return false;
+    }
+    if (0 == checks_characters.GetInteger(0)) {
+      LOGGER_INFO(
+          logger_,
+          "Keyboard properties doesn't contain table limited character list");
+      return true;
+    }
   }
   utils::dbms::SQLQuery select_characters(db());
   if (!select_characters.Prepare(kSelectCharacter)) {
@@ -1654,22 +1716,25 @@ bool ResumptionDataDB::ExecInsertImage(
     int64_t& image_primary_key, const smart_objects::SmartObject& image) const {
   LOGGER_AUTO_TRACE(logger_);
   using namespace app_mngr;
-  utils::dbms::SQLQuery count_image_query(db());
-  utils::dbms::SQLQuery query(db());
   uint16_t count_image = 0;
-  bool result = count_image_query.Prepare(kSelectCountImage);
-  if (result) {
-    count_image_query.Bind(0, image[strings::value].asString());
-    result = count_image_query.Exec();
+  bool result = false;
+  {
+    utils::dbms::SQLQuery count_image_query(db());
+    result = count_image_query.Prepare(kSelectCountImage);
     if (result) {
-      count_image = count_image_query.GetInteger(0);
+      count_image_query.Bind(0, image[strings::value].asString());
+      result = count_image_query.Exec();
+      if (result) {
+        count_image = count_image_query.GetInteger(0);
+      }
+    }
+    if (!result) {
+      LOGGER_WARN(logger_,
+                  "Problem with preparing or execution count_image_query.");
+      return false;
     }
   }
-  if (!result) {
-    LOGGER_WARN(logger_,
-                "Problem with preparing or execution count_image_query.");
-    return false;
-  }
+  utils::dbms::SQLQuery query(db());
   if (count_image) {
     result = query.Prepare(kSelectPrimaryKeyImage);
     if (result) {
